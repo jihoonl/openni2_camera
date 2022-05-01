@@ -74,10 +74,10 @@ OpenNI2Driver::OpenNI2Driver(const rclcpp::NodeOptions & node_options) :
   enable_reconnect_ = declare_parameter<bool>("enable_reconnect", true);
 
   ir_frame_id_ = declare_parameter<std::string>("ir_frame_id", "openni_ir_optical_frame");
-  color_frame_id_ = declare_parameter<std::string>("rgb_frame_id", "openni_rgb_optical_frame");
+  color_frame_id_ = declare_parameter<std::string>("color_frame_id", "openni_rgb_optical_frame");
   depth_frame_id_ = declare_parameter<std::string>("depth_frame_id", "openni_depth_optical_frame");
 
-  color_info_url_ = declare_parameter<std::string>("rgb_camera_info_url", "");
+  color_info_url_ = declare_parameter<std::string>("color_camera_info_url", "");
   ir_info_url_ = declare_parameter<std::string>("depth_camera_info_url", "");
 
   genVideoModeTableMap();
@@ -99,9 +99,13 @@ OpenNI2Driver::OpenNI2Driver(const rclcpp::NodeOptions & node_options) :
     RCLCPP_ERROR(this->get_logger(), "Undefined color video mode");
   }
 
-  color_topic_name_ = declare_parameter<std::string>("color_image_topic", "rgb/image_raw");
+  color_topic_name_ = declare_parameter<std::string>("color_topic_name", "rgb/image_raw");
   depth_topic_name_ = declare_parameter<std::string>("depth_topic_name", "depth/image");
   ir_topic_name_    = declare_parameter<std::string>("ir_topic_name", "ir/image");
+
+  RCLCPP_INFO(this->get_logger(), " Color topic <%s> with frame <%s>", color_topic_name_.c_str(), color_frame_id_.c_str());
+  RCLCPP_INFO(this->get_logger(), "   IR  topic <%s> with frame <%s>", ir_topic_name_.c_str(),    ir_frame_id_.c_str());
+  RCLCPP_INFO(this->get_logger(), " Depth topic <%s> with frame <%s>", depth_topic_name_.c_str(), depth_frame_id_.c_str());
 
   ir_video_mode_.pixel_format_ = PIXEL_FORMAT_GRAY16;
   color_video_mode_.pixel_format_ = PIXEL_FORMAT_RGB888;
@@ -876,23 +880,21 @@ void OpenNI2Driver::initDevice()
     try
     {
       std::string device_URI = resolveDeviceURI(device_id_);
-      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - deviceUIR=<%s>  - try empty instead ....\n", device_URI.c_str());
-      device_URI = "";
       device_ = device_manager_->getDevice(device_URI, this);
-      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - got device with deviceUIR=<%s>.\n", device_URI.c_str());
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - got device with deviceURI=<%s> from id=<%s>.\n", device_URI.c_str(), device_id_.c_str());
       bus_id_ = extractBusID(device_->getUri() );
     }
     catch (const OpenNI2Exception& exception)
     {
       if (!device_)
       {
-        RCLCPP_INFO(this->get_logger(), "No matching device found.... waiting for devices.\n Reason: %s", exception.what());
+        RCLCPP_WARN(this->get_logger(), "No matching device found for id=<%s> .... waiting for devices.\n Reason: %s", device_id_.c_str(), exception.what());
         boost::this_thread::sleep(boost::posix_time::seconds(3));
         continue;
       }
       else
       {
-        RCLCPP_ERROR(this->get_logger(), "Could not retrieve device.\n Reason: %s", exception.what());
+        RCLCPP_ERROR(this->get_logger(), "Could not retrieve device <%s>.\n Reason: %s", device_id_.c_str(), exception.what());
         exit(-1);
       }
     }

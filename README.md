@@ -1,6 +1,16 @@
 openni2_camera
 ==============
 
+## The fork includes the OpenNI-Linux-x64-2.3 files that work with the original Orbbec Astra
+
+  It would be better if I provided a link to where I downloaded the OpenNI-Linux-x64-2.3.zip
+  for that particular SDK version that I have included, but in the various testing and frantic debugging trying to bring the Astra to life
+  under ROS 2 that information has been lost :-(
+
+  This works, where the Ubuntu 20.04 OpenNI version was not recognizing the camera.
+  
+==============
+
 ROS2 wrapper for openni 2.0
 
 Note: openni2_camera supports xtion devices, but not Kinects.

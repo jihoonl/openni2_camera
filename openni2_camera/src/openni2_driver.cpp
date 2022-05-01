@@ -99,6 +99,10 @@ OpenNI2Driver::OpenNI2Driver(const rclcpp::NodeOptions & node_options) :
     RCLCPP_ERROR(this->get_logger(), "Undefined color video mode");
   }
 
+  color_topic_name_ = declare_parameter<std::string>("color_image_topic", "rgb/image_raw");
+  depth_topic_name_ = declare_parameter<std::string>("depth_topic_name", "depth/image");
+  ir_topic_name_    = declare_parameter<std::string>("ir_topic_name", "ir/image");
+
   ir_video_mode_.pixel_format_ = PIXEL_FORMAT_GRAY16;
   color_video_mode_.pixel_format_ = PIXEL_FORMAT_RGB888;
   depth_video_mode_.pixel_format_ = PIXEL_FORMAT_DEPTH_1_MM;
@@ -128,13 +132,16 @@ void OpenNI2Driver::periodic()
 {
   if (!initialized_)
   {
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - try to initialize");
     initDevice();
     advertiseROSTopics();
     applyConfigToOpenNIDevice();
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - deviced opened.");
 
     // Register parameter callback
     this->set_on_parameters_set_callback(std::bind(&OpenNI2Driver::paramCb, this, std::placeholders::_1));
     initialized_ = true;
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver -initialized!");
   }
 
   // TODO: check subscriber counts, enable cameras
@@ -142,8 +149,9 @@ void OpenNI2Driver::periodic()
   depthConnectCb();
   irConnectCb();
 
-  if (enable_reconnect_)
+  if (enable_reconnect_) {
     monitorConnection();
+  }
 }
 
 void OpenNI2Driver::advertiseROSTopics()
@@ -158,21 +166,30 @@ void OpenNI2Driver::advertiseROSTopics()
   boost::lock_guard<boost::mutex> lock(connect_mutex_);
 
   // Asus Xtion PRO does not have an RGB camera
-  if (device_->hasColorSensor())
+  if (device_->hasColorSensor() && color_topic_name_.length() > 0)
   {
-    pub_color_ = it.advertiseCamera("rgb/image_raw", 1);
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - advertise color publisher on <%s>", color_topic_name_.c_str());
+    pub_color_ = it.advertiseCamera(color_topic_name_, 1);
+  } else {
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - not publishing color image!");
   }
 
-  if (device_->hasIRSensor())
+  if (device_->hasIRSensor() && ir_topic_name_.length() > 0)
   {
-    pub_ir_ = it.advertiseCamera("ir/image", 1);
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - advertise IR publisher on <%s>", ir_topic_name_.c_str());
+    pub_ir_ = it.advertiseCamera(ir_topic_name_, 1);
+  } else {
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - not publishing IR image!");
   }
 
-  if (device_->hasDepthSensor())
+  if (device_->hasDepthSensor() && depth_topic_name_.length() > 0)
   {
-    pub_depth_raw_ = it.advertiseCamera("depth/image_raw", 1);
-    pub_depth_ = it.advertiseCamera("depth/image", 1);
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - advertise depth publishers");
+    pub_depth_raw_ = it.advertiseCamera(depth_topic_name_+"_raw", 1);
+    pub_depth_ = it.advertiseCamera(depth_topic_name_, 1);
     pub_projector_info_ = this->create_publisher<sensor_msgs::msg::CameraInfo>("projector/camera_info", 1);
+  } else {
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - not publishing depth image!");
   }
 
   ////////// CAMERA INFO MANAGER
@@ -186,6 +203,7 @@ void OpenNI2Driver::advertiseROSTopics()
   ir_name  = "depth_" + serial_number;
 
   // Load the saved calibrations, if they exist
+  RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - camera info <%s> camera name=<%s>", color_info_url_.c_str(), color_name.c_str());
   color_info_manager_ = std::make_shared<camera_info_manager::CameraInfoManager>(this, color_name, color_info_url_);
   ir_info_manager_  = std::make_shared<camera_info_manager::CameraInfoManager>(this,  ir_name,  ir_info_url_);
 
@@ -216,6 +234,7 @@ void OpenNI2Driver::setIRVideoMode(const OpenNI2VideoMode& ir_video_mode)
   {
     if (ir_video_mode != device_->getIRVideoMode())
     {
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - setIRVideoMode %d", ir_video_mode);
       device_->setIRVideoMode(ir_video_mode);
     }
   }
@@ -230,6 +249,7 @@ void OpenNI2Driver::setColorVideoMode(const OpenNI2VideoMode& color_video_mode)
   {
     if (color_video_mode != device_->getColorVideoMode())
     {
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - setColorVideoMode %d", color_video_mode);
       device_->setColorVideoMode(color_video_mode);
     }
   }
@@ -244,6 +264,7 @@ void OpenNI2Driver::setDepthVideoMode(const OpenNI2VideoMode& depth_video_mode)
   {
     if (depth_video_mode != device_->getDepthVideoMode())
     {
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - setDepthVideoMode %d", depth_video_mode);
       device_->setDepthVideoMode(depth_video_mode);
     }
   }
@@ -259,6 +280,7 @@ void OpenNI2Driver::applyConfigToOpenNIDevice()
   data_skip_color_counter_= 0;
   data_skip_depth_counter_ = 0;
 
+  RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - applyConfigToOpenNIDevice ...");
   setIRVideoMode(ir_video_mode_);
   setColorVideoMode(color_video_mode_);
   setDepthVideoMode(depth_video_mode_);
@@ -335,6 +357,7 @@ void OpenNI2Driver::applyConfigToOpenNIDevice()
   }
 
   device_->setUseDeviceTimer(use_device_time_);
+  RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - applyConfigToOpenNIDevice done.");
 }
 
 void OpenNI2Driver::forceSetExposure()
@@ -370,12 +393,21 @@ void OpenNI2Driver::colorConnectCb()
   }
   boost::lock_guard<boost::mutex> lock(connect_mutex_);
 
-  // This does not appear to work
-  color_subscribers_ = pub_color_.getNumSubscribers() > 0;
+  int color_subscribers_cnt = this->count_subscribers(color_topic_name_);
+  color_subscribers_ = color_subscribers_cnt > 0;
+  // if (color_subscribers_) {
+  //   RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - colorConnectCb  color subscribers = %d", color_subscribers_);
+  // }
+  // else {
+  //   // This does not appear to work, just publish all the time for now
+  //   RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - colorConnectCb  color subscribers = %d - Force anyway!", color_subscribers_);
+  //   color_subscribers_ = true;
+  // }
 
   if (color_subscribers_ && !device_->isColorStreamStarted())
   {
     // Can't stream IR and RGB at the same time. Give RGB preference.
+    RCLCPP_INFO(this->get_logger(), "Have color subscribers and need to start!");
     if (device_->isIRStreamStarted())
     {
       RCLCPP_ERROR(this->get_logger(), "Cannot stream RGB and IR at the same time. Streaming RGB only.");
@@ -385,8 +417,15 @@ void OpenNI2Driver::colorConnectCb()
 
     device_->setColorFrameCallback(boost::bind(&OpenNI2Driver::newColorFrameCallback, this, _1));
 
-    RCLCPP_INFO(this->get_logger(), "Starting color stream.");
+    RCLCPP_INFO(this->get_logger(), "Starting color stream ...");
     device_->startColorStream();
+
+    if (device_->isColorStreamStarted())
+    {
+        RCLCPP_INFO(this->get_logger(), "color stream started!");
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to start the color stream!");
+    }
 
     // Workaound for https://github.com/ros-drivers/openni2_camera/issues/51
     if (exposure_ != 0)
@@ -396,6 +435,7 @@ void OpenNI2Driver::colorConnectCb()
       boost::this_thread::sleep(boost::posix_time::milliseconds(100));
       forceSetExposure();
     }
+    RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - colorConnectCb done - started=%d", device_->isColorStreamStarted());
   }
   else if (!color_subscribers_ && device_->isColorStreamStarted())
   {
@@ -412,6 +452,7 @@ void OpenNI2Driver::colorConnectCb()
       device_->startIRStream();
     }
   }
+
 }
 
 void OpenNI2Driver::depthConnectCb()
@@ -423,10 +464,15 @@ void OpenNI2Driver::depthConnectCb()
   }
   boost::lock_guard<boost::mutex> lock(connect_mutex_);
 
-  // These does not appear to work
-  depth_subscribers_ = pub_depth_.getNumSubscribers() > 0;
-  depth_raw_subscribers_ = pub_depth_raw_.getNumSubscribers() > 0;
-  projector_info_subscribers_ = pub_projector_info_->get_subscription_count() > 0;
+  if (depth_topic_name_.length() > 0)
+  {
+    int depth_subscribers_cnt = this->count_subscribers(depth_topic_name_);
+    int depth_raw_subscribers_cnt = this->count_subscribers(depth_topic_name_+"_raw");
+
+    depth_subscribers_ = depth_subscribers_cnt > 0;
+    depth_raw_subscribers_ = depth_raw_subscribers_cnt > 0;
+    projector_info_subscribers_ = this->count_subscribers("projector/camera_info");
+  }
 
   bool need_depth = depth_subscribers_ || depth_raw_subscribers_;
 
@@ -455,7 +501,7 @@ void OpenNI2Driver::irConnectCb()
 
   // This does not appear to work
   // ir_subscribers_ = pub_ir_.getNumSubscribers() > 0;
-  ir_subscribers_ = this->count_subscribers("ir/image") > 0 ||
+  ir_subscribers_ = this->count_subscribers(ir_topic_name_) > 0 ||
                     this->count_subscribers("ir/camera_info") > 0;
 
   if (ir_subscribers_ && !device_->isIRStreamStarted())
@@ -507,6 +553,7 @@ void OpenNI2Driver::newColorFrameCallback(sensor_msgs::msg::Image::SharedPtr ima
   if (!rclcpp::ok())
   {
     // Don't publish to invalid publishers
+    RCLCPP_WARN(this->get_logger(), "OpenNI2Driver - newColorFrameCallback don't publish to invalid publishers!");
     return;
   }
 
@@ -829,20 +876,23 @@ void OpenNI2Driver::initDevice()
     try
     {
       std::string device_URI = resolveDeviceURI(device_id_);
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - deviceUIR=<%s>  - try empty instead ....\n", device_URI.c_str());
+      device_URI = "";
       device_ = device_manager_->getDevice(device_URI, this);
+      RCLCPP_INFO(this->get_logger(), "OpenNI2Driver - got device with deviceUIR=<%s>.\n", device_URI.c_str());
       bus_id_ = extractBusID(device_->getUri() );
     }
     catch (const OpenNI2Exception& exception)
     {
       if (!device_)
       {
-        RCLCPP_INFO(this->get_logger(), "No matching device found.... waiting for devices. Reason: %s", exception.what());
+        RCLCPP_INFO(this->get_logger(), "No matching device found.... waiting for devices.\n Reason: %s", exception.what());
         boost::this_thread::sleep(boost::posix_time::seconds(3));
         continue;
       }
       else
       {
-        RCLCPP_ERROR(this->get_logger(), "Could not retrieve device. Reason: %s", exception.what());
+        RCLCPP_ERROR(this->get_logger(), "Could not retrieve device.\n Reason: %s", exception.what());
         exit(-1);
       }
     }

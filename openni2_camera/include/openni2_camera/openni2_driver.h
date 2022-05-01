@@ -146,6 +146,10 @@ private:
 
   std::string color_info_url_, ir_info_url_;
 
+  std::string color_topic_name_;
+  std::string depth_topic_name_;
+  std::string ir_topic_name_;
+
   bool color_depth_synchronization_;
   bool depth_registration_;
 

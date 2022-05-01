@@ -15,18 +15,21 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
 find_package(PkgConfig)
-pkg_check_modules(PC_OPENNI2 libopenni2)
-if (NOT PC_OPENNI2_FOUND)
-  pkg_check_modules(PC_OPENNI2 REQUIRED openni2)
-endif()
+
+# Using custom install of OpenNI-Linux-x64-2.3
+#pkg_check_modules(PC_OPENNI2 libopenni2)
+#if (NOT PC_OPENNI2_FOUND)
+#  pkg_check_modules(PC_OPENNI2 REQUIRED openni2)
+#endif()
 
 include_directories(
   include
+  include/openni
   ${Boost_INCLUDE_DIRS}
-  ${PC_OPENNI2_INCLUDE_DIRS}
+#  ${PC_OPENNI2_INCLUDE_DIRS}
 )
 
-link_directories(${PC_OPENNI2_LIBRARY_DIRS})
+link_directories(libopenni2)
 
 add_library(openni2_wrapper SHARED
   src/openni2_convert.cpp
@@ -40,7 +43,8 @@ add_library(openni2_wrapper SHARED
 )
 target_link_libraries(openni2_wrapper
   ${Boost_LIBRARIES}
-  ${PC_OPENNI2_LIBRARIES}
+  #${PC_OPENNI2_LIBRARIES}
+  libOpenNI2.so
 )
 ament_target_dependencies(openni2_wrapper
   camera_info_manager
@@ -101,6 +105,12 @@ install(
 )
 
 install(
+  DIRECTORY libopenni2/
+  DESTINATION lib
+)
+
+
+install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}/
 )
@@ -115,4 +125,3 @@ ament_export_dependencies(
   rclcpp
 )
 ament_package()
-

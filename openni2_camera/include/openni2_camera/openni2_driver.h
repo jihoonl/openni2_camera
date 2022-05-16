@@ -39,8 +39,8 @@
 
 #include <sensor_msgs/msg/image.hpp>
 
-#include <image_transport/image_transport.h>
-#include <camera_info_manager/camera_info_manager.h>
+#include <image_transport/image_transport.hpp>
+#include <camera_info_manager/camera_info_manager.hpp>
 
 #include <string>
 #include <vector>
@@ -73,7 +73,7 @@ private:
   sensor_msgs::msg::CameraInfo::SharedPtr getProjectorCameraInfo(int width, int height, rclcpp::Time time) const;
 
   // resolves non-URI device IDs to URIs, e.g. '#1' is resolved to the URI of the first device
-  std::string resolveDeviceURI(const std::string& device_id) throw(OpenNI2Exception);
+  std::string resolveDeviceURI(const std::string& device_id) ; // throw(OpenNI2Exception);
   void initDevice();
 
   void advertiseROSTopics();
@@ -99,7 +99,7 @@ private:
   void genVideoModeTableMap();
   bool lookupVideoMode(const std::string& mode, OpenNI2VideoMode& video_mode);
 
-  sensor_msgs::msg::Image::ConstPtr rawToFloatingPointConversion(sensor_msgs::msg::Image::ConstPtr raw_image);
+  sensor_msgs::msg::Image::ConstSharedPtr rawToFloatingPointConversion(sensor_msgs::msg::Image::ConstSharedPtr raw_image);
 
   void setIRVideoMode(const OpenNI2VideoMode& ir_video_mode);
   void setColorVideoMode(const OpenNI2VideoMode& color_video_mode);
@@ -135,6 +135,7 @@ private:
 
   /** \brief Camera info manager objects. */
   std::shared_ptr<camera_info_manager::CameraInfoManager> color_info_manager_, ir_info_manager_;
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_ptr_;
 
   OpenNI2VideoMode ir_video_mode_;
   OpenNI2VideoMode color_video_mode_;

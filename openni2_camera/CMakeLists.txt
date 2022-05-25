@@ -51,6 +51,7 @@ ament_target_dependencies(openni2_wrapper
   image_transport
   sensor_msgs
   rclcpp
+  rclcpp_components
 )
 
 #add_executable(test_wrapper test/test_wrapper.cpp)

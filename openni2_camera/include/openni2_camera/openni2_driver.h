@@ -140,6 +140,7 @@ private:
   OpenNI2VideoMode color_video_mode_;
   OpenNI2VideoMode depth_video_mode_;
 
+  std::string frame_prefix_;
   std::string ir_frame_id_;
   std::string color_frame_id_;
   std::string depth_frame_id_ ;

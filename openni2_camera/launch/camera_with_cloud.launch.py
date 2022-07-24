@@ -39,40 +39,67 @@ import launch_ros.actions
 import launch_ros.descriptions
 
 
-def generate_launch_description():
-
-    namespace = '/camera'
+def rgbd_camera_container(device_id, namespace):
 
     container = launch_ros.actions.ComposableNodeContainer(
-            name='container',
-            namespace=namespace,
-            package='rclcpp_components',
-            executable='component_container',
-            composable_node_descriptions=[
-                # Driver
-                launch_ros.descriptions.ComposableNode(
-                    package='openni2_camera',
-                    plugin='openni2_wrapper::OpenNI2Driver',
-                    name='driver',
-                    namespace=namespace,
-                    parameters=[{'depth_registration': True},
-                                {'use_device_time': False}],
-                    remappings=[('depth/image', 'depth_registered/image_raw')],
-                ),
-                # Create XYZRGB point cloud
-                launch_ros.descriptions.ComposableNode(
-                    package='depth_image_proc',
-                    plugin='depth_image_proc::PointCloudXyzrgbNode',
-                    name='points_xyzrgb',
-                    namespace=namespace,
-                    parameters=[{'queue_size': 10}],
-                    remappings=[('rgb/image_rect_color', 'rgb/image_raw'),
-                                ('rgb/camera_info', 'rgb/camera_info'),
-                                ('depth_registered/image_rect', 'depth_registered/image_raw'),
-                                ('points', 'depth_registered/points'), ],
-                ),
-            ],
-            output='screen',
+        name='container',
+        namespace=namespace,
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=[
+            # Driver
+            launch_ros.descriptions.ComposableNode(
+                package='openni2_camera',
+                plugin='openni2_wrapper::OpenNI2Driver',
+                name='driver',
+                namespace=namespace,
+                parameters=[{
+                    'depth_registration': True,
+                    'device_id': device_id,
+                    'frame_prefix': namespace
+                }, {
+                    'use_device_time': False
+                }],
+                # remappings=[('depth/image_raw', 'depth_registered/image_raw')],
+            ),
+            # Create XYZRGB point cloud
+            launch_ros.descriptions.ComposableNode(
+                package='depth_image_proc',
+                plugin='depth_image_proc::PointCloudXyzrgbNode',
+                name='points_xyzrgb',
+                namespace=namespace,
+                parameters=[{
+                    'queue_size': 20
+                }],
+                remappings=[
+                    ('rgb/image_rect_color', 'rgb/image_raw'),
+                    ('rgb/camera_info', 'rgb/camera_info'),
+                    ('depth_registered/image_rect', 'depth/image'),
+                    ('points', 'depth_registered/points'),
+                ],
+            ),
+        ],
+        output='screen',
     )
+    return container
 
-    return launch.LaunchDescription([container])
+
+def generate_launch_description():
+    container_mini = rgbd_camera_container('17', 'mini')
+    container_orbbec = rgbd_camera_container('19', 'orbbec')
+    tf_node_mini = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=list(map(str, [0, 0, -1, 0, 0, -1.57, 'base', 'mini/openni_rgb_optical_frame'])))
+    tf_node_orbbec = launch_ros.actions.Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=list(map(str, [0, 0, 1., 0, 0, -1.57, 'base', 'orbbec/openni_rgb_optical_frame'])))
+
+    ld = launch.LaunchDescription([
+        launch.actions.TimerAction(period=1.0,
+                                   actions=[tf_node_mini, tf_node_orbbec]),
+        launch.actions.TimerAction(period=2.0, actions=[container_mini]),
+        launch.actions.TimerAction(period=3.0, actions=[container_orbbec]),
+    ])
+    return ld
